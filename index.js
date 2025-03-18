@@ -1,4 +1,3 @@
-const { default: puppeteer } = require("puppeteer");
 const { connect } = require("puppeteer-real-browser");
 const fs = require("fs");
 

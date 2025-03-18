@@ -1,0 +1,15 @@
+{
+  "name": "tik-tok-scraper",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": " "
+  },
+  "author": "Roger Rodrigues",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "puppeteer": "^24.4.0",
+    "puppeteer-real-browser": "^1.4.2"
+  }
+}

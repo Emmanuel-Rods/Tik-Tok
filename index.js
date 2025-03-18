@@ -37,10 +37,10 @@ async function run() {
   try {
     //visit the url
     await page.goto(userProfile, { waitUntil: "networkidle2" });
-    console.log("page loaded");
+    //// console.log("page loaded");
     //wait for everything to load
     await new Promise((res) => setTimeout(res, 1500));
-    console.log("getting name");
+    // console.log("getting name");
 
     const userInfo = await page.evaluate(() => {
       const getText = (selector) => {
@@ -54,9 +54,9 @@ async function run() {
       };
     });
 
-    console.log(userInfo);
+    // console.log(userInfo);
 
-    console.log("getting info");
+    // console.log("getting info");
 
     const stats = await page.evaluate(() => {
       const getCount = (selector) => {
@@ -72,13 +72,13 @@ async function run() {
     });
     console.log(stats);
     //now tap the popoular section
-    console.log("clicking popular ");
+    // console.log("clicking popular ");
     const popularBtn = await page.waitForSelector(
       'button[aria-label="Popular"]'
     );
     //
     await popularBtn.click();
-    console.log("clicked popular button");
+    // console.log("clicked popular button");
 
     //now scroll
     // Defining a function to scroll to the bottom of the page
@@ -119,7 +119,7 @@ async function run() {
       return data;
     });
 
-    // console.log(resuts);
+    //// console.log(resuts);
     const data = {
       userInfo,
       stats,
@@ -127,7 +127,7 @@ async function run() {
     };
     fs.writeFileSync(`${username}.json`, JSON.stringify(data, null, 2));
   } catch (error) {
-    console.log(error);
+    // console.log(error);
   }
 }
 

@@ -104,7 +104,7 @@ async function run() {
       const data = [];
       const posts = document.querySelectorAll('div[data-e2e="user-post-item"]');
 
-      for (let i = 0; i < posts.length && i <= posts.length; i++) {
+      for (let i = 0; i <= posts.length; i++) {
         const post = posts[i];
         const linkElement = post.querySelector("a");
         const viewsElement = post.querySelector('[data-e2e="video-views"]');

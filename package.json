@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": " "
+    "dev": "node index.js"
   },
   "author": "Roger Rodrigues",
   "license": "ISC",

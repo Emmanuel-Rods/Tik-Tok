@@ -1,16 +1,30 @@
 const { connect } = require("puppeteer-real-browser");
 const fs = require("fs");
+const exportToExcel = require("./excel.js");
 
-const username = "mrbeast"; //username without the " @ " prefix
+//scraper controls
+const scrollDelay = 3000; // in milliseconds
+const usernames = ["wowgreatplace", "adilet.sw"];
 
-async function run() {
-  const { browser, page } = await connect({
+//file controls
+const exportConfig = {
+  json: true,
+  excel: true,
+};
+
+async function run(username, speed = 25) {
+  if (!exportConfig.excel && !exportConfig.json) {
+    console.warn(`Both export format are set to false`);
+    console.warn(`Select atleast one export format`);
+    return;
+  }
+  const { browser } = await connect({
     defaultViewport: null,
     headless: false,
 
     args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
+      // "--no-sandbox",
+      // "--disable-setuid-sandbox",
       "--disable-notifications",
       "--disable-geolocation",
     ],
@@ -34,6 +48,10 @@ async function run() {
   const baseLink = "https://www.tiktok.com/";
   const userProfile = baseLink + "@" + username;
   try {
+    const cookieJson = fs.readFileSync("cookies.json", "utf-8");
+    const cookies = JSON.parse(cookieJson);
+    await browser.setCookie(...cookies);
+    const page = await browser.newPage();
     //visit the url
     await page.goto(userProfile, { waitUntil: "networkidle2" });
     //// console.log("page loaded");
@@ -53,7 +71,7 @@ async function run() {
       };
     });
 
-    // console.log(userInfo);
+    console.log(userInfo);
 
     // console.log("getting info");
 
@@ -78,6 +96,7 @@ async function run() {
     //
     await popularBtn.click();
     // console.log("clicked popular button");
+    await new Promise((res) => setTimeout(res, 2000));
 
     //now scroll
     // Defining a function to scroll to the bottom of the page
@@ -85,7 +104,7 @@ async function run() {
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight);
       });
-      await new Promise((res) => setTimeout(res, 2000));
+      await new Promise((res) => setTimeout(res, scrollDelay));
     };
 
     // Scrolling in a loop until a certain condition is met
@@ -104,7 +123,7 @@ async function run() {
       const data = [];
       const posts = document.querySelectorAll('div[data-e2e="user-post-item"]');
 
-      for (let i = 0; i <= posts.length; i++) {
+      for (let i = 0; i < posts.length; i++) {
         const post = posts[i];
         const linkElement = post.querySelector("a");
         const viewsElement = post.querySelector('[data-e2e="video-views"]');
@@ -114,20 +133,125 @@ async function run() {
           views: viewsElement ? viewsElement.textContent.trim() : null,
         });
       }
-
+      console.log(data);
       return data;
     });
 
     //// console.log(resuts);
-    const data = {
+    const viewsData = {
       userInfo,
       stats,
       results,
     };
-    fs.writeFileSync(`${username}.json`, JSON.stringify(data, null, 2));
+
+    // return data;
+
+    //here ends views code
+
+    const videos = await page.$$('div[data-e2e="user-post-item-list"] > div');
+    if (videos.length > 0) {
+      await videos[videos.length - 1].click(); // Click the first video
+    } else {
+      console.error("No videos found!");
+    }
+    // console.log("clicked the last vid");
+    await new Promise((res) => setTimeout(res, 2000));
+    //and then wait for an arbiturary value
+
+    let nextBtn = await page.waitForSelector('button[data-e2e="arrow-left"]');
+
+    const engagement = [];
+
+    while (nextBtn) {
+      nextBtn = await page.waitForSelector('button[data-e2e="arrow-left"]');
+      await new Promise((res) => setTimeout(res, speed));
+      const videoInfo = await page.evaluate(() => {
+        const getText = (selector) => {
+          const element = document.querySelector(`${selector}`);
+          return element ? element.textContent.trim() : null;
+        };
+        const getCleanLink = (selector) => {
+          const element = document.querySelector(selector);
+          if (!element) return null;
+          return element.textContent.trim().split("?")[0]; // Remove everything after '?'
+        };
+
+        const getDate = (selector) => {
+          const spans = document.querySelectorAll(selector);
+          return spans.length >= 3 ? spans[2].textContent.trim() : null;
+        };
+
+        return {
+          likes: getText('strong[data-e2e="browse-like-count"]'),
+          comments: getText('strong[data-e2e="browse-comment-count"]'),
+          saves: getText('strong[data-e2e="undefined-count"]'),
+          link: getCleanLink('p[data-e2e="browse-video-link"]'),
+          uploadDate: getDate('span[data-e2e="browser-nickname"] span'),
+        };
+      });
+
+      console.log(videoInfo);
+
+      engagement.push(videoInfo);
+
+      const isDisabled = await page.evaluate(() => {
+        const btn = document.querySelector('button[data-e2e="arrow-left"]');
+        return btn ? btn.disabled : true;
+      });
+
+      if (isDisabled) break; // Stop if the button is disabled
+
+      await page.keyboard.press("ArrowUp");
+    }
+
+    // here starts merging code
+    const viewsObj = viewsData.results;
+
+    const merged = viewsObj.map((result) => {
+      const match = engagement.find((e) => e.link === result.link);
+      return match ? { ...result, ...match } : result;
+    });
+
+    const final = {
+      userInfo: viewsData.userInfo,
+      stats: viewsData.stats,
+      results: merged,
+    };
+
+    //convert json/excel into file
+    if (exportConfig.json) {
+      fs.writeFile(
+        `${username}.json`,
+        JSON.stringify(final, null, 2),
+        "utf8",
+        (err) => {
+          if (err) {
+            console.error(`Error writing ${username}.json:`, err);
+          } else {
+            console.log(`✅ Merged data saved to ${username}.json`);
+          }
+        }
+      );
+    }
+    if (exportConfig.excel) {
+      exportToExcel(final, username);
+    }
+    const newCookies = await browser.cookies();
+    fs.writeFileSync("cookies.json", JSON.stringify(newCookies, null, 2));
   } catch (error) {
-    // console.log(error);
+    console.log(error);
+  } finally {
+    browser.close();
   }
 }
 
-run();
+// run(username);
+
+async function runUsernames(usernames) {
+  for (const username of usernames) {
+    console.log(`Scraping data for: ${username}`);
+    await run(username); // Run the function for each username
+  }
+}
+
+runUsernames(usernames);
